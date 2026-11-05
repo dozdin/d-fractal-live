@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#05040a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -33,7 +33,8 @@
   --warn: #ffb03d;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; touch-action: manipulation;
+  -webkit-text-size-adjust: 100%; overscroll-behavior: none;
   font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; outline: none; touch-action: none; }
 /* Pantalla completa: todo negro, sin bordes ni contornos de foco alrededor */
@@ -6591,23 +6592,48 @@ $('#fsBtn').addEventListener('click', toggleFullscreen);
 $('#hideBtn').addEventListener('click', () => $('#ui').classList.add('hide'));
 $('#menuBtn').addEventListener('click', (e) => { e.stopPropagation(); showPanel(); });
 
-// Pantalla completa (con prefijos para Safari). En iPhone la web no puede ponerse a pantalla completa:
-// se explica cómo añadirla a la pantalla de inicio, que la abre sin barras.
+// Pantalla completa (con prefijos para Safari).
+// En iPhone una web no puede ponerse a pantalla completa, solo los vídeos (así lo hace YouTube). Por eso allí los
+// visuales se emiten en directo a un <video> (captureStream del lienzo) y es ese vídeo el que pasa a pantalla completa nativa.
 const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+const CAN_ELEM_FS = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+let fsVideo = null, fsVideoOn = false;
+function prepFsVideo() {
+  if (fsVideo || CAN_ELEM_FS || !canvas.captureStream) return;
+  fsVideo = document.createElement('video');
+  fsVideo.muted = true; fsVideo.playsInline = true; fsVideo.autoplay = true;
+  fsVideo.setAttribute('playsinline', ''); fsVideo.setAttribute('muted', ''); fsVideo.setAttribute('webkit-playsinline', '');
+  // Tiene que estar en la página y reproduciéndose para poder pasar a pantalla completa al instante.
+  fsVideo.style.cssText = 'position:fixed;left:0;top:0;width:4px;height:4px;opacity:0.01;pointer-events:none;z-index:0';
+  fsVideo.srcObject = canvas.captureStream(60);
+  document.body.appendChild(fsVideo);
+  fsVideo.play().catch(() => {});
+  fsVideo.addEventListener('webkitbeginfullscreen', () => { fsVideoOn = true; syncFs(); });
+  fsVideo.addEventListener('webkitendfullscreen', () => { fsVideoOn = false; fsVideo.play().catch(() => {}); syncFs(); });
+}
+if (IS_MOBILE) prepFsVideo();
 function toggleFullscreen() {
   const d = document.documentElement;
   if (fsEl()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
-  const req = d.requestFullscreen || d.webkitRequestFullscreen;
+  const req = CAN_ELEM_FS && (d.requestFullscreen || d.webkitRequestFullscreen);
   if (req) {
     const p = req.call(d, { navigationUI: 'hide' });
-    if (p && p.then) p.then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) { } }).catch(() => iosFsHelp());
-  } else iosFsHelp();
+    if (p && p.then) p.then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) { } }).catch(() => videoFullscreen() || iosFsHelp());
+    return;
+  }
+  if (!videoFullscreen()) iosFsHelp();
+}
+function videoFullscreen() {
+  prepFsVideo();
+  if (!fsVideo || !fsVideo.webkitEnterFullscreen) return false;
+  if (fsVideo.paused) fsVideo.play().catch(() => {});
+  try { fsVideo.webkitEnterFullscreen(); return true; } catch (e) { return false; }
 }
 function iosFsHelp() {
   toast('Para verlo a pantalla completa en iPhone: Compartir ⬆️ → "Añadir a pantalla de inicio" y ábrelo desde ese icono', 6000, true);
 }
 const syncFs = () => {
-  const on = !!fsEl();
+  const on = !!fsEl() || fsVideoOn;
   document.body.classList.toggle('fs', on);
   $('#fsFab').textContent = $('#fsHead').textContent = on ? '🗗' : '⛶';
   // Al cambiar de tamaño el lienzo debe ocupar exactamente la nueva pantalla (si no, quedan bordes).
