@@ -35,7 +35,8 @@ body.idle, body.idle * { cursor: none !important; }
   border-radius: 10px; overflow: hidden; box-shadow: 0 10px 40px #000a; display: none; background: #000; }
 #ytWrap.on { display: block; }
 #ytWrap.bg { inset: 0; width: 100%; height: 100%; border-radius: 0; z-index: 0; aspect-ratio: auto; }
-#ytWrap.hidden { opacity: 0; pointer-events: none; width: 2px; height: 2px; }
+/* Oculto: a pantalla completa pero detrás del lienzo opaco (si se encoge o se hace transparente, el navegador lo pausa o no deja que suene) */
+#ytWrap.hidden { inset: 0; width: 100%; height: 100%; border-radius: 0; z-index: 0; aspect-ratio: auto; box-shadow: none; }
 body.ytbg canvas#gl { mix-blend-mode: screen; }
 #ytWrap { pointer-events: none; overflow: hidden; }
 #ytWrap iframe, #ytPlayer { width: 100%; height: 100%; border: 0; pointer-events: none; }
@@ -107,7 +108,40 @@ select option { background: #15122a; }
 /* ---- Pantalla inicial ---- */
 #unmute { position: fixed; z-index: 9; left: 50%; bottom: 26px; transform: translateX(-50%); padding: 10px 18px; border-radius: 12px;
   background: rgba(10,8,20,.75); border: 1px solid var(--panel-border); font-weight: 700; display: none; cursor: pointer; }
-#unmute.on { display: block; }
+#unmute.on { display: block; animation: unmutePulse 1.6s ease-in-out infinite; }
+@keyframes unmutePulse { 50% { box-shadow: 0 0 0 6px #ff3df233, 0 0 30px #ff3df255; } }
+#menuBtn { position: fixed; z-index: 6; left: 14px; top: 14px; width: 46px; height: 46px; border-radius: 50%; font-size: 20px;
+  background: rgba(10,8,20,.65); color: #fff; border: 1px solid var(--panel-border); cursor: pointer; display: none;
+  transition: opacity .4s; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+#ui.hide ~ #menuBtn { display: block; }
+body.idle #menuBtn { opacity: 0; }
+
+/* ---- Móvil y tableta ---- */
+body.mobile #menuBtn { left: 12px; top: auto; bottom: calc(12px + env(safe-area-inset-bottom)); width: 54px; height: 54px; font-size: 24px; }
+body.mobile.idle #menuBtn { opacity: .22; }
+body.mobile #unmute { bottom: auto; top: 50%; transform: translate(-50%, -50%); padding: 18px 26px; font-size: 18px; text-align: center; width: max-content; max-width: 86vw; }
+body.mobile .btn { padding: 11px 12px; font-size: 14px; }
+body.mobile input[type=text], body.mobile select { font-size: 16px; padding: 10px; }
+body.mobile .check input { width: 20px; height: 20px; }
+body.mobile .tabs { overflow-x: auto; scrollbar-width: none; }
+body.mobile .tabs button { flex: 0 0 auto; padding: 12px 12px; font-size: 13.5px; }
+body.mobile .keys-help { display: none; }
+body.mobile #ytWrap:not(.bg):not(.hidden) { width: 46vw; right: 10px; bottom: 10px; }
+@media (max-width: 720px) {
+  #ui { left: 0; right: 0; top: auto; bottom: 0; width: 100%; max-height: 72vh; border-radius: 18px 18px 0 0;
+    padding-bottom: env(safe-area-inset-bottom); }
+  #ui.hide { transform: translateY(40px); }
+  .head { padding: 12px 14px 6px; }
+  .bpm { min-width: 56px; }
+  .row label { flex-basis: 92px; font-size: 12.5px; }
+  .fxrow { grid-template-columns: 1fr 78px 84px; }
+  .combos { grid-template-columns: 1fr 1fr; }
+  .presets { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  #ui { top: 0; bottom: 0; left: 0; right: auto; width: min(400px, 58vw); max-height: 100%; border-radius: 0 18px 18px 0; }
+  #ui.hide { transform: translateX(-30px); }
+}
 .card { width: min(560px, 92vw); text-align: center; padding: 34px 30px; border-radius: 22px; background: var(--panel);
   border: 1px solid var(--panel-border); box-shadow: 0 30px 90px #000; }
 .card h1 { margin: 0 0 6px; font-size: 44px; font-weight: 900; letter-spacing: .04em;
@@ -369,8 +403,8 @@ input[type=color] { width: 100%; height: 30px; border: 1px solid var(--panel-bor
       <div class="status" id="midiStatus"></div>
       <p class="note">Notas: cada nota elige una escena (Do3 = escena 1…). Controles CC1-CC8: velocidad, resplandor, sensibilidad, estelas, caleidoscopio, giro de color, brillo y destello.</p>
 
-      <h4>Atajos</h4>
-      <div class="keys">
+      <h4 class="keys-help">Atajos</h4>
+      <div class="keys keys-help">
         <b>Espacio / →</b><span>Siguiente escena</span><b>←</b><span>Escena anterior</span>
         <b>1-9, 0</b><span>Escena directa</span><b>R</b><span>Escena aleatoria</span>
         <b>A</b><span>DJ automático</span><b>P</b><span>Siguiente paleta</span>
@@ -387,6 +421,7 @@ input[type=color] { width: 100%; height: 30px; border: 1px solid var(--panel-bor
     </div>
   </div>
 </div>
+<button id="menuBtn" aria-label="Abrir el panel" title="Abrir el panel (H)">☰</button>
 <input type="file" id="logoInput" accept="image/*" style="display:none">
 <img id="logo" alt="">
 <script>
@@ -401,6 +436,10 @@ const lerp = (a, b, t) => a + (b - a) * t;
 //  Ajustes (se guardan en el navegador)
 // =====================================================================================
 const DEFAULT_YT = 'https://www.youtube.com/watch?v=lxw2v6NzkW0';   // vídeo con el que arranca siempre
+// Móvil o tableta: pantalla táctil sin ratón, o navegador móvil.
+const IS_MOBILE = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches
+  || /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle/i.test(navigator.userAgent);
+if (IS_MOBILE) document.body.classList.add('mobile');
 const DEFAULTS = {
   // Audio
   sens: 1.0, speed: 1.0, gainBass: 1.0, gainMid: 1.0, gainHigh: 1.0, beatSens: 1.0, syncAuto: true, syncMs: 0,
@@ -613,7 +652,9 @@ const YT = {
     S.ytUrl = url; save();
     await this.loadApi();
     // Sin controles, título, anotaciones ni vídeos relacionados; en bucle.
-    const vars = { autoplay: play ? 1 : 0, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1,
+    // Sin interacción previa los navegadores solo dejan reproducir en silencio: arranca muda y el primer toque le da sonido.
+    const canSound = !!(navigator.userActivation && navigator.userActivation.hasBeenActive);
+    const vars = { autoplay: play ? 1 : 0, mute: canSound ? 0 : 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1,
       rel: 0, playsinline: 1, loop: 1, cc_load_policy: 0 };
     if (list) { vars.listType = 'playlist'; vars.list = list; } else { vars.playlist = id; }
     $('#ytWrap').classList.add('on');
@@ -626,7 +667,11 @@ const YT = {
     } else if (!this.player) {
       this.player = new window.YT.Player('ytPlayer', { videoId: id || undefined, playerVars: vars,
         events: {
-          onReady: (e) => { this.ready = true; fitYt(); if (this.wantPlay) e.target.playVideo(); },
+          onReady: (e) => {
+            this.ready = true; fitYt();
+            if (navigator.userActivation && navigator.userActivation.hasBeenActive) { e.target.unMute(); e.target.setVolume(100); }
+            if (this.wantPlay) e.target.playVideo();
+          },
           onStateChange: (e) => { if (e.data === 0) e.target.playVideo(); }, // fin: vuelve a empezar
         } });
     }
@@ -4935,7 +4980,7 @@ function freeTarget(t) { if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(
 
 const R = { W: 0, H: 0, scale: 1, targets: {} };
 function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const dpr = Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.25 : 2);   // en móvil, menos píxeles para ir fluido
   const q = clamp(S.quality * R.scale, 0.25, 1);
   const W = Math.max(64, Math.floor(innerWidth * dpr * q)), H = Math.max(64, Math.floor(innerHeight * dpr * q));
   if (W === R.W && H === R.H) return;
@@ -6414,21 +6459,34 @@ $('#ytView').value = S.ytView;
 YT.load(S.ytUrl, true);
 // Los navegadores suelen bloquear el sonido hasta la primera interacción: se avisa sin molestar
 // y el primer clic o tecla lo activa todo.
-setTimeout(() => { if (!YT.ready || YT.player.getPlayerState() !== 1) $('#unmute').classList.add('on'); }, 2500);
+if (IS_MOBILE) $('#unmute').textContent = '🔊 Toca la pantalla para activar el sonido';
+const ytAudible = () => YT.ready && !YT.player.isMuted() && YT.player.getPlayerState() === 1;
+// El aviso de sonido se queda hasta que el vídeo suena de verdad (o se elige otra fuente).
+setTimeout(() => { if (A.kind === 'youtube' && !ytAudible()) $('#unmute').classList.add('on'); }, 1200);
+const GESTURES = ['pointerup', 'touchend', 'click', 'keydown'];
 const firstGesture = () => {
   ensureAudio();
   if (!YT.loaded && A.kind === 'none') YT.load(DEFAULT_YT, true);
-  if (A.kind === 'youtube' && YT.ready && YT.player.getPlayerState() !== 1) YT.player.playVideo();
-  $('#unmute').classList.remove('on');
-  removeEventListener('pointerdown', firstGesture, true);
-  removeEventListener('keydown', firstGesture, true);
+  if (A.kind === 'youtube' && YT.ready) {
+    // Todo dentro del propio gesto: así el navegador permite el sonido.
+    YT.player.unMute(); YT.player.setVolume(100);
+    if (YT.player.getPlayerState() !== 1) YT.player.playVideo();
+  }
+  setTimeout(() => {
+    if (A.kind !== 'youtube' || ytAudible()) {
+      $('#unmute').classList.remove('on');
+      GESTURES.forEach((g) => removeEventListener(g, firstGesture, true));
+    } else {
+      $('#unmute').classList.add('on');
+    }
+  }, 900);
 };
-addEventListener('pointerdown', firstGesture, true);
-addEventListener('keydown', firstGesture, true);
+GESTURES.forEach((g) => addEventListener(g, firstGesture, true));
 $('#vBpm').addEventListener('input', (e) => { F.vBpm = +e.target.value; $('#vBpmV').textContent = F.vBpm; });
 $('#tap').addEventListener('click', tap);
 $('#fsBtn').addEventListener('click', toggleFullscreen);
 $('#hideBtn').addEventListener('click', () => $('#ui').classList.add('hide'));
+$('#menuBtn').addEventListener('click', (e) => { e.stopPropagation(); showPanel(); });
 
 function toggleFullscreen() {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
@@ -6469,7 +6527,7 @@ addEventListener('keydown', (e) => {
   else if (k === 'c') { const i = COMBOS.findIndex((cb) => cb.n === FXS.manualCombo); applyCombo(i + 1 < COMBOS.length ? COMBOS[i + 1] : null); }
   else if (k === 'v') { const i = SHOWS.findIndex((s) => s.id === S.show); const sh = SHOWS[(i + 1) % SHOWS.length]; S.show = sh.id; S.autoDJ = true; save(); buildShows(); Director.autoNext(); toast('Show: ' + sh.n); }
   else if (k === 't') tap();
-  else if (k === 'h') $('#ui').classList.toggle('hide');
+  else if (k === 'h') { if ($('#ui').classList.contains('hide')) showPanel(); else $('#ui').classList.add('hide'); }
   else if (k === 'f') toggleFullscreen();
   else if (k === 'n') playTrack(A.track + 1);
   else return;
@@ -6477,22 +6535,30 @@ addEventListener('keydown', (e) => {
 });
 
 // ---- Ocultar panel y cursor sin actividad ----
-let idleTimer = 0;
+// Al abrir la página el panel desaparece enseguida si no se toca; si lo estás usando, espera un poco más.
+let idleTimer = 0, panelUsed = 0;
 function wake() {
   document.body.classList.remove('idle');
   clearTimeout(idleTimer);
+  const wait = performance.now() - panelUsed < 15000 ? (IS_MOBILE ? 6000 : 4000) : 2500;
   idleTimer = setTimeout(() => {
     if (!S.autoHide) return;
-    if ($('#ui').matches(':hover')) return wake();
+    if (!IS_MOBILE && $('#ui').matches(':hover')) return wake();     // en táctil :hover se queda pegado
+    const a = document.activeElement;
+    if (a && $('#ui').contains(a) && /INPUT|SELECT|TEXTAREA/.test(a.tagName) && a.type !== 'range' && a.type !== 'checkbox') return wake();
     document.body.classList.add('idle');
     $('#ui').classList.add('hide');
-  }, 3500);
+  }, wait);
 }
+function showPanel() { $('#ui').classList.remove('hide'); panelUsed = performance.now(); wake(); }
 addEventListener('mousemove', (e) => {
   wake();
-  if (e.clientX < 60 && $('#ui').classList.contains('hide')) $('#ui').classList.remove('hide');
+  if (e.clientX < 60 && $('#ui').classList.contains('hide')) showPanel();
 });
 addEventListener('pointerdown', wake);
+['pointerdown', 'input', 'change', 'wheel'].forEach((ev) => $('#ui').addEventListener(ev, () => { panelUsed = performance.now(); wake(); }, true));
+$('#ui').addEventListener('scroll', () => { panelUsed = performance.now(); wake(); }, true);
+wake();
 
 // ¡En marcha!
 resize();
