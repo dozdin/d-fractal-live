@@ -35,7 +35,13 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
   font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; outline: none; }
+/* Pantalla completa: todo negro, sin bordes ni contornos de foco alrededor */
+:fullscreen, :-webkit-full-screen, html:fullscreen body { background: #000 !important; outline: none !important; border: 0 !important; }
+::backdrop { background: #000; }
+html:fullscreen, html:-webkit-full-screen { width: 100%; height: 100%; }
+button:focus { outline: none; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 body.idle, body.idle * { cursor: none !important; }
 
 /* ---- Vídeo de YouTube ---- */
@@ -75,6 +81,10 @@ body.ytcard #ytSkip { display: block; }
 .logo { font-weight: 900; font-size: 16px; letter-spacing: .05em; white-space: nowrap;
   background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .head .sp { flex: 1; }
+.hbtn { background: rgba(255,255,255,0.06); border: 1px solid var(--panel-border); color: var(--text); border-radius: 9px;
+  width: 32px; height: 32px; font-size: 15px; line-height: 1; cursor: pointer; flex: 0 0 auto; padding: 0; }
+.hbtn:hover { background: rgba(255,255,255,0.14); }
+#pager { display: none; }
 .meter { display: flex; gap: 3px; align-items: flex-end; height: 22px; }
 .meter i { display: block; width: 6px; background: linear-gradient(var(--accent), var(--accent2)); border-radius: 2px; height: 2px; }
 .bpm { font: 700 12px ui-monospace, Consolas, monospace; color: var(--muted); min-width: 66px; text-align: right; }
@@ -141,22 +151,48 @@ body.idle #fsFab { opacity: 0; }
 body.fs #fsFab { font-size: 17px; }
 
 /* ---- Móvil y tableta ---- */
+/* El contenido de cada pestaña se reparte en páginas horizontales del alto del panel: nunca hay scroll vertical. */
+body.mobile #ui { display: flex; flex-direction: column; height: calc(100% - 28px); }
+body.mobile .tabs { display: grid; grid-template-columns: repeat(6, 1fr); overflow: visible; padding: 0 6px; }
+body.mobile .tabs button { padding: 11px 0; font-size: 12.5px; min-width: 0; }
+body.mobile .head .meter, body.mobile .head .phase { display: none; }
+body.mobile .hbtn { width: 40px; height: 40px; font-size: 18px; border-radius: 11px; }
+body.mobile .note { display: none; }
+body.mobile .body { flex: 1 1 auto; min-height: 0; overflow-x: auto; overflow-y: hidden; padding: 10px 14px 34px;
+  scrollbar-width: none; overscroll-behavior: contain; }
+body.mobile .body::-webkit-scrollbar { display: none; }
+body.mobile .pane.on { height: 100%; column-count: 1; column-gap: 28px; column-fill: auto; }
+body.mobile .pane .row, body.mobile .fxrow, body.mobile .check, body.mobile .btn, body.mobile .status, body.mobile .playlist { break-inside: avoid; }
+body.mobile h4 { break-after: avoid; margin-top: 10px; }
+body.mobile .grid2, body.mobile .grid3, body.mobile .scenes, body.mobile .shows, body.mobile .combos, body.mobile .pals,
+body.mobile .presets, body.mobile .colors, body.mobile .chips { display: block; font-size: 0; }   /* sin huecos entre botones en línea */
+body.mobile .colors > *, body.mobile .grid2 > :not(.btn), body.mobile .grid3 > :not(.btn) { font-size: 13px; }
+body.mobile .grid2 > *, body.mobile .scenes > *, body.mobile .shows > * { display: inline-block; vertical-align: top; width: calc(50% - 5px); margin: 0 5px 6px 0; }
+body.mobile .grid3 > *, body.mobile .combos > * { display: inline-block; vertical-align: top; width: calc(33.33% - 5px); margin: 0 5px 6px 0; }
+body.mobile .pals > *, body.mobile .presets > *, body.mobile .colors > * { display: inline-block; vertical-align: top; width: calc(25% - 5px); margin: 0 5px 6px 0; }
+body.mobile .chips > * { display: inline-block; margin: 0 5px 6px 0; }
+body.mobile .pal { height: 30px; }
+body.mobile #pager { display: flex; position: fixed; z-index: 7; align-items: center; gap: 4px; pointer-events: auto;
+  background: rgba(10,8,20,.85); border: 1px solid var(--panel-border); border-radius: 999px; padding: 2px; font: 700 12px ui-monospace, monospace; color: var(--muted); }
+body.mobile #pager button { width: 34px; height: 30px; border: 0; background: none; color: var(--text); font-size: 20px; line-height: 1; border-radius: 999px; }
+body.mobile #pager button:disabled { opacity: .25; }
+body.mobile #ui.hide ~ #pager, body.mobile #pager.single { display: none; }
 body.mobile #menuBtn { left: 12px; top: auto; bottom: calc(12px + env(safe-area-inset-bottom)); width: 54px; height: 54px; font-size: 24px; }
 body.mobile.idle #menuBtn { opacity: .22; }
-body.mobile #fsFab { left: 76px; top: auto; bottom: calc(12px + env(safe-area-inset-bottom)); width: 54px; height: 54px; font-size: 24px; }
-body.mobile.idle #fsFab { opacity: .22; }
+body.mobile #fsFab { left: auto; right: 12px; top: auto; bottom: calc(12px + env(safe-area-inset-bottom)); width: 58px; height: 58px; font-size: 26px;
+  background: rgba(10,8,20,.75); border-color: #ff3df288; box-shadow: 0 0 18px #ff3df244; }
+body.mobile.idle #fsFab { opacity: .45; }
 body.standalone #fsFab { display: none !important; }
 body.mobile #unmute { bottom: auto; top: 50%; transform: translate(-50%, -50%); padding: 18px 26px; font-size: 18px; text-align: center; width: max-content; max-width: 86vw; }
 body.mobile .btn { padding: 11px 12px; font-size: 14px; }
 body.mobile input[type=text], body.mobile select { font-size: 16px; padding: 10px; }
 body.mobile .check input { width: 20px; height: 20px; }
-body.mobile .tabs { overflow-x: auto; scrollbar-width: none; }
-body.mobile .tabs button { flex: 0 0 auto; padding: 12px 12px; font-size: 13.5px; }
 body.mobile .keys-help { display: none; }
 body.mobile #ytWrap:not(.bg):not(.hidden) { width: 46vw; right: 10px; bottom: 10px; }
 @media (max-width: 720px) {
-  #ui { left: 0; right: 0; top: auto; bottom: 0; width: 100%; max-height: 72vh; border-radius: 18px 18px 0 0;
+  #ui { left: 0; right: 0; top: auto; bottom: 0; width: 100%; height: 64dvh; max-height: 64dvh; border-radius: 18px 18px 0 0;
     padding-bottom: env(safe-area-inset-bottom); }
+  body.mobile #pager { right: 12px; bottom: calc(8px + env(safe-area-inset-bottom)); }
   #ui.hide { transform: translateY(40px); }
   .head { padding: 12px 14px 6px; }
   .bpm { min-width: 56px; }
@@ -166,7 +202,10 @@ body.mobile #ytWrap:not(.bg):not(.hidden) { width: 46vw; right: 10px; bottom: 10
   .presets { grid-template-columns: repeat(4, 1fr); }
 }
 @media (max-height: 520px) and (orientation: landscape) {
-  #ui { top: 0; bottom: 0; left: 0; right: auto; width: min(400px, 58vw); max-height: 100%; border-radius: 0 18px 18px 0; }
+  #ui { top: 0; bottom: 0; left: 0; right: auto; width: min(420px, 60vw); height: 100%; max-height: 100%; border-radius: 0 18px 18px 0; }
+  body.mobile #pager { left: calc(min(420px, 60vw) - 128px); bottom: 8px; }
+  body.mobile .head { padding: 6px 12px 4px; }
+  body.mobile .tabs button { padding: 8px 0; }
   #ui.hide { transform: translateX(-30px); }
 }
 .card { width: min(560px, 92vw); text-align: center; padding: 34px 30px; border-radius: 22px; background: var(--panel);
@@ -235,6 +274,8 @@ input[type=color] { width: 100%; height: 30px; border: 1px solid var(--panel-bor
     <div class="meter" id="meter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     <div class="bpm" id="bpm">--- BPM</div>
     <div class="phase" id="phase"></div>
+    <button class="hbtn" id="fsHead" title="Pantalla completa (F)" aria-label="Pantalla completa">⛶</button>
+    <button class="hbtn" id="closeUi" title="Ocultar panel (H)" aria-label="Ocultar panel">✕</button>
   </div>
   <div class="tabs" id="tabs">
     <button data-tab="src" class="on">Fuente</button>
@@ -244,7 +285,7 @@ input[type=color] { width: 100%; height: 30px; border: 1px solid var(--panel-bor
     <button data-tab="dj">DJ</button>
     <button data-tab="out">Salida</button>
   </div>
-  <div class="body">
+  <div class="body" id="uiBody">
     <!-- Fuente -->
     <div class="pane on" data-pane="src">
       <h4>Audio</h4>
@@ -451,6 +492,7 @@ input[type=color] { width: 100%; height: 30px; border: 1px solid var(--panel-bor
 <button id="menuBtn" aria-label="Abrir el panel" title="Abrir el panel (H)">☰</button>
 <button id="fsFab" aria-label="Pantalla completa" title="Pantalla completa (F)">⛶</button>
 <button id="ytSkip">Seguir sin sonido</button>
+<div id="pager"><button id="pgPrev" aria-label="Página anterior">‹</button><span id="pgInfo">1/1</span><button id="pgNext" aria-label="Página siguiente">›</button></div>
 <input type="file" id="logoInput" accept="image/*" style="display:none">
 <img id="logo" alt="">
 <script>
@@ -4963,7 +5005,7 @@ const ptrPos = (e) => {
   const x = (e.clientX - innerWidth / 2) / innerHeight, y = (innerHeight / 2 - e.clientY) / innerHeight;
   return Number.isFinite(x) && Number.isFinite(y) ? [x, y] : [PTR.tx, PTR.ty];   // algunos eventos sintéticos no traen coordenadas
 };
-const onUI = (e) => !!(e.target && e.target.closest && e.target.closest('#ui, #unmute, #dropHint, #ytSkip, #menuBtn, #fsFab'));
+const onUI = (e) => !!(e.target && e.target.closest && e.target.closest('#ui, #unmute, #dropHint, #ytSkip, #menuBtn, #fsFab, #pager'));
 function addClick(x, y) { PTR.clicks.set([x, y, Clock.t], (PTR.ci++ % 8) * 3); }
 addEventListener('pointermove', (e) => { if (onUI(e)) return; [PTR.tx, PTR.ty] = ptrPos(e); PTR.last = Clock.t; });
 addEventListener('pointerdown', (e) => {
@@ -6564,11 +6606,46 @@ function toggleFullscreen() {
 function iosFsHelp() {
   toast('Para verlo a pantalla completa en iPhone: Compartir ⬆️ → "Añadir a pantalla de inicio" y ábrelo desde ese icono', 6000, true);
 }
-const syncFs = () => { const on = !!fsEl(); document.body.classList.toggle('fs', on); $('#fsFab').textContent = on ? '🗗' : '⛶'; };
+const syncFs = () => {
+  const on = !!fsEl();
+  document.body.classList.toggle('fs', on);
+  $('#fsFab').textContent = $('#fsHead').textContent = on ? '🗗' : '⛶';
+  // Al cambiar de tamaño el lienzo debe ocupar exactamente la nueva pantalla (si no, quedan bordes).
+  [0, 120, 400].forEach((t) => setTimeout(() => { resize(); fitYt(); updatePager(); }, t));
+};
 document.addEventListener('fullscreenchange', syncFs);
 document.addEventListener('webkitfullscreenchange', syncFs);
 if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) document.body.classList.add('standalone');
 $('#fsFab').addEventListener('click', (e) => { e.stopPropagation(); toggleFullscreen(); });
+$('#fsHead').addEventListener('click', (e) => { e.stopPropagation(); toggleFullscreen(); });
+$('#closeUi').addEventListener('click', (e) => { e.stopPropagation(); $('#ui').classList.add('hide'); });
+
+// ---- Páginas del panel en el móvil (deslizar en horizontal) ----
+const uiBody = $('#uiBody');
+function pagerGeom() { const cs = getComputedStyle(uiBody); return { w: uiBody.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) + 28 }; }
+function updatePager() {
+  if (!IS_MOBILE) return;
+  const { w } = pagerGeom();
+  const pages = Math.max(1, Math.round((uiBody.scrollWidth - uiBody.clientWidth) / w) + 1);
+  const cur = Math.min(pages, Math.round(uiBody.scrollLeft / w) + 1);
+  $('#pgInfo').textContent = cur + '/' + pages;
+  $('#pgPrev').disabled = cur <= 1; $('#pgNext').disabled = cur >= pages;
+  $('#pager').classList.toggle('single', pages <= 1);
+}
+function goPage(d) { const { w } = pagerGeom(); uiBody.scrollTo({ left: (Math.round(uiBody.scrollLeft / w) + d) * w, behavior: 'smooth' }); }
+let pagerSnap = 0;
+uiBody.addEventListener('scroll', () => {
+  updatePager();
+  clearTimeout(pagerSnap);
+  if (!IS_MOBILE) return;
+  pagerSnap = setTimeout(() => { const { w } = pagerGeom(); const t = Math.round(uiBody.scrollLeft / w) * w; if (Math.abs(t - uiBody.scrollLeft) > 2) uiBody.scrollTo({ left: t, behavior: 'smooth' }); }, 140);
+}, { passive: true });
+$('#pgPrev').addEventListener('click', (e) => { e.stopPropagation(); goPage(-1); });
+$('#pgNext').addEventListener('click', (e) => { e.stopPropagation(); goPage(1); });
+$('#tabs').addEventListener('click', () => { uiBody.scrollLeft = 0; setTimeout(updatePager, 30); });
+addEventListener('resize', () => setTimeout(updatePager, 50));
+new MutationObserver(() => updatePager()).observe($('#ui'), { attributes: true, attributeFilter: ['class'] });
+setTimeout(updatePager, 300);
 // Doble clic / doble toque sobre los visuales: entra o sale de pantalla completa.
 addEventListener('dblclick', (e) => { if (!(e.target && e.target.closest && e.target.closest('#ui, #menuBtn, #fsFab, #ytSkip, #unmute'))) toggleFullscreen(); });
 
@@ -6619,7 +6696,7 @@ let idleTimer = 0, panelUsed = 0;
 function wake() {
   document.body.classList.remove('idle');
   clearTimeout(idleTimer);
-  const wait = performance.now() - panelUsed < 15000 ? (IS_MOBILE ? 6000 : 4000) : 2500;
+  const wait = performance.now() - panelUsed < 15000 ? (IS_MOBILE ? 10000 : 4000) : 2500;
   idleTimer = setTimeout(() => {
     if (!S.autoHide) return;
     if (!IS_MOBILE && $('#ui').matches(':hover')) return wake();     // en táctil :hover se queda pegado
@@ -6630,16 +6707,22 @@ function wake() {
   }, wait);
 }
 function showPanel() { $('#ui').classList.remove('hide'); panelUsed = performance.now(); wake(); }
-addEventListener('mousemove', (e) => {
+// Solo el ratón de verdad abre el panel al acercarse al borde izquierdo (los toques en el móvil generan movimientos de ratón falsos).
+addEventListener('pointermove', (e) => {
+  if (e.pointerType !== 'mouse') return;
   wake();
   if (e.clientX < 60 && $('#ui').classList.contains('hide')) showPanel();
 });
-addEventListener('pointerdown', (e) => {
-  // Tocar fuera del panel (en los visuales) lo oculta al momento.
-  const t = e.target;
-  if (!(t && t.closest && t.closest('#ui, #menuBtn, #fsFab, #ytSkip, #unmute, #dropHint'))) $('#ui').classList.add('hide');
+// Tocar o pulsar fuera del panel (en los visuales) lo oculta al momento.
+const KEEP_UI = '#ui, #menuBtn, #fsFab, #ytSkip, #unmute, #dropHint, #pager';
+function outsideTap(e) {
+  const path = e.composedPath ? e.composedPath() : [e.target];
+  const inside = path.some((n) => n && n.matches && n.matches(KEEP_UI));
+  if (!inside) $('#ui').classList.add('hide');
   wake();
-});
+}
+document.addEventListener('pointerdown', outsideTap, true);
+document.addEventListener('touchstart', outsideTap, { capture: true, passive: true });
 ['pointerdown', 'input', 'change', 'wheel'].forEach((ev) => $('#ui').addEventListener(ev, () => { panelUsed = performance.now(); wake(); }, true));
 $('#ui').addEventListener('scroll', () => { panelUsed = performance.now(); wake(); }, true);
 wake();
