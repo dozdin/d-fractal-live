@@ -35,7 +35,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
   font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; outline: none; }
+canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; outline: none; touch-action: none; }
 /* Pantalla completa: todo negro, sin bordes ni contornos de foco alrededor */
 :fullscreen, :-webkit-full-screen, html:fullscreen body { background: #000 !important; outline: none !important; border: 0 !important; }
 ::backdrop { background: #000; }
@@ -6647,7 +6647,7 @@ addEventListener('resize', () => setTimeout(updatePager, 50));
 new MutationObserver(() => updatePager()).observe($('#ui'), { attributes: true, attributeFilter: ['class'] });
 setTimeout(updatePager, 300);
 // Doble clic / doble toque sobre los visuales: entra o sale de pantalla completa.
-addEventListener('dblclick', (e) => { if (!(e.target && e.target.closest && e.target.closest('#ui, #menuBtn, #fsFab, #ytSkip, #unmute'))) toggleFullscreen(); });
+addEventListener('dblclick', (e) => { if (!IS_MOBILE && !(e.target && e.target.closest && e.target.closest('#ui, #menuBtn, #fsFab, #ytSkip, #unmute'))) toggleFullscreen(); });
 
 // Arrastrar y soltar canciones
 let dragDepth = 0;
@@ -6723,6 +6723,35 @@ function outsideTap(e) {
 }
 document.addEventListener('pointerdown', outsideTap, true);
 document.addEventListener('touchstart', outsideTap, { capture: true, passive: true });
+
+// ---- Móvil: cada toque en el fondo cambia escena, efectos y mezcla de escenas ----
+// Solo cuenta un toque corto y quieto: arrastrar el dedo sigue moviendo las escenas interactivas.
+let tapStart = null, lastTapChange = 0;
+const insideUI = (e) => (e.composedPath ? e.composedPath() : [e.target]).some((n) => n && n.matches && n.matches(KEEP_UI));
+document.addEventListener('pointerdown', (e) => {
+  tapStart = IS_MOBILE && e.isPrimary && !insideUI(e) ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
+}, true);
+document.addEventListener('pointercancel', () => { tapStart = null; }, true);
+document.addEventListener('pointerup', (e) => {
+  const s = tapStart; tapStart = null;
+  if (!s || insideUI(e)) return;
+  const now = performance.now();
+  if (Math.hypot(e.clientX - s.x, e.clientY - s.y) > 18 || now - s.t > 600 || now - lastTapChange < 350) return;
+  lastTapChange = now;
+  tapChange();
+}, true);
+function tapChange() {
+  Director.surprise();                                    // escena nueva con su estilo (efectos, combo, capa) y un momento sorpresa
+  if ((S.maxScenes || 1) >= 2 && Math.random() < 0.5) {   // la mitad de las veces, además, varias escenas a la vez
+    Director.styleMix(Director.next >= 0 ? Director.next : Director.cur, Director.show(), 1, true);
+    if (!S.autoDJ) FXS.extraHold = true;
+  }
+}
+// Aviso una sola vez por dispositivo.
+if (IS_MOBILE && !S.tapHint) setTimeout(() => {
+  toast('👆 Toca el fondo para cambiar de escena y efectos · arrastra el dedo para interactuar', 4500, true);
+  S.tapHint = true; save();
+}, 9000);
 ['pointerdown', 'input', 'change', 'wheel'].forEach((ev) => $('#ui').addEventListener(ev, () => { panelUsed = performance.now(); wake(); }, true));
 $('#ui').addEventListener('scroll', () => { panelUsed = performance.now(); wake(); }, true);
 wake();
