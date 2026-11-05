@@ -40,6 +40,16 @@ body.idle, body.idle * { cursor: none !important; }
 body.ytbg canvas#gl { mix-blend-mode: screen; }
 #ytWrap { pointer-events: none; overflow: hidden; }
 #ytWrap iframe, #ytPlayer { width: 100%; height: 100%; border: 0; pointer-events: none; }
+/* Móvil: el sonido solo se puede activar tocando el propio reproductor, así que se muestra en una tarjeta */
+#ytWrap.tapcard { inset: auto; left: 50%; top: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%);
+  width: min(88vw, 560px); height: auto; aspect-ratio: 16 / 9; z-index: 12; pointer-events: auto; opacity: 1;
+  border-radius: 14px; box-shadow: 0 0 0 2px #ff3df2, 0 0 40px #ff3df288, 0 20px 60px #000; }
+#ytWrap.tapcard iframe { pointer-events: auto; }
+body.mobile.ytcard #unmute { top: calc(50% - min(88vw, 560px) * 0.28 - 18px); transform: translate(-50%, -100%); z-index: 13; font-size: 16px; padding: 12px 18px; }
+#ytSkip { position: fixed; z-index: 12; left: 50%; transform: translateX(-50%); top: calc(50% + min(88vw, 560px) * 0.28 + 18px);
+  display: none; padding: 10px 18px; border-radius: 10px; background: rgba(10,8,20,.75); color: var(--muted);
+  border: 1px solid var(--panel-border); font: 600 14px system-ui, sans-serif; }
+body.ytcard #ytSkip { display: block; }
 
 /* ---- Texto en pantalla ---- */
 #overlayText { position: fixed; z-index: 2; left: 0; right: 0; text-align: center; pointer-events: none;
@@ -422,6 +432,7 @@ input[type=color] { width: 100%; height: 30px; border: 1px solid var(--panel-bor
   </div>
 </div>
 <button id="menuBtn" aria-label="Abrir el panel" title="Abrir el panel (H)">☰</button>
+<button id="ytSkip">Seguir sin sonido</button>
 <input type="file" id="logoInput" accept="image/*" style="display:none">
 <img id="logo" alt="">
 <script>
@@ -654,7 +665,7 @@ const YT = {
     // Sin controles, título, anotaciones ni vídeos relacionados; en bucle.
     // Sin interacción previa los navegadores solo dejan reproducir en silencio: arranca muda y el primer toque le da sonido.
     const canSound = !!(navigator.userActivation && navigator.userActivation.hasBeenActive);
-    const vars = { autoplay: play ? 1 : 0, mute: canSound ? 0 : 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1,
+    const vars = { autoplay: play ? 1 : 0, mute: canSound ? 0 : 1, controls: IS_MOBILE ? 1 : 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1,
       rel: 0, playsinline: 1, loop: 1, cc_load_policy: 0 };
     if (list) { vars.listType = 'playlist'; vars.list = list; } else { vars.playlist = id; }
     $('#ytWrap').classList.add('on');
@@ -710,6 +721,7 @@ function applyYtView() {
 function fitYt() {
   const w = $('#ytWrap'), fr = w.querySelector('iframe');
   if (!fr) return;
+  if (w.classList.contains('tapcard')) { Object.assign(fr.style, { position: 'absolute', width: '100%', height: '100%', left: '0', top: '0' }); return; }
   const r = w.getBoundingClientRect();
   const cw = Math.max(r.width, r.height * 16 / 9) * 1.2, ch = cw * 9 / 16;
   Object.assign(fr.style, { position: 'absolute', width: cw + 'px', height: ch + 'px', left: (r.width - cw) / 2 + 'px', top: (r.height - ch) / 2 + 'px' });
@@ -4933,7 +4945,7 @@ const ptrPos = (e) => {
   const x = (e.clientX - innerWidth / 2) / innerHeight, y = (innerHeight / 2 - e.clientY) / innerHeight;
   return Number.isFinite(x) && Number.isFinite(y) ? [x, y] : [PTR.tx, PTR.ty];   // algunos eventos sintéticos no traen coordenadas
 };
-const onUI = (e) => !!(e.target && e.target.closest && e.target.closest('#ui, #unmute, #dropHint'));
+const onUI = (e) => !!(e.target && e.target.closest && e.target.closest('#ui, #unmute, #dropHint, #ytSkip, #menuBtn'));
 function addClick(x, y) { PTR.clicks.set([x, y, Clock.t], (PTR.ci++ % 8) * 3); }
 addEventListener('pointermove', (e) => { if (onUI(e)) return; [PTR.tx, PTR.ty] = ptrPos(e); PTR.last = Clock.t; });
 addEventListener('pointerdown', (e) => {
@@ -6459,10 +6471,41 @@ $('#ytView').value = S.ytView;
 YT.load(S.ytUrl, true);
 // Los navegadores suelen bloquear el sonido hasta la primera interacción: se avisa sin molestar
 // y el primer clic o tecla lo activa todo.
-if (IS_MOBILE) $('#unmute').textContent = '🔊 Toca la pantalla para activar el sonido';
+// Móvil: el navegador solo deja dar sonido al vídeo si el toque cae en el propio reproductor de YouTube.
+// Se muestra en una tarjeta; al tocarlo, el reproductor recibe el permiso y se le quita el silencio.
+// En cuanto suena, vuelve a su sitio (oculto detrás de los visuales).
+let ytCardPoll = 0, ytTouched = false;
+function ytCard(on) {
+  document.body.classList.toggle('ytcard', on);
+  if (on) $('#ui').classList.add('hide');
+  $('#ytWrap').classList.toggle('tapcard', on);
+  if (!on) { clearInterval(ytCardPoll); applyYtView(); }
+  fitYt();
+}
+function ytUnmuteNow() { if (YT.ready) { YT.player.unMute(); YT.player.setVolume(100); if (YT.player.getPlayerState() !== 1) YT.player.playVideo(); } }
+if (IS_MOBILE) {
+  $('#unmute').textContent = '🔊 Toca el vídeo para activar el sonido (si no suena, pulsa su altavoz)';
+  $('#unmute').classList.add('on');
+  ytCard(true);
+  // Al tocar el reproductor el foco pasa a su iframe: en ese momento ya tiene permiso para sonar.
+  // El propio toque puede pausar el vídeo justo después: se insiste unos instantes hasta que suene.
+  addEventListener('blur', () => setTimeout(() => {
+    if (document.activeElement && document.activeElement.tagName === 'IFRAME' && $('#ytWrap').contains(document.activeElement)) {
+      ytTouched = true;
+      [0, 300, 700, 1200].forEach((t) => setTimeout(ytUnmuteNow, t));
+    }
+  }, 50));
+  ytCardPoll = setInterval(() => {
+    if (A.kind !== 'youtube' || (YT.ready && !YT.player.isMuted() && YT.player.getPlayerState() === 1)) {
+      ytCard(false);
+      $('#unmute').classList.remove('on');
+    } else if (ytTouched) ytUnmuteNow();
+  }, 400);
+  $('#ytSkip').addEventListener('click', (e) => { e.stopPropagation(); ytCard(false); $('#unmute').classList.remove('on'); });
+}
 const ytAudible = () => YT.ready && !YT.player.isMuted() && YT.player.getPlayerState() === 1;
 // El aviso de sonido se queda hasta que el vídeo suena de verdad (o se elige otra fuente).
-setTimeout(() => { if (A.kind === 'youtube' && !ytAudible()) $('#unmute').classList.add('on'); }, 1200);
+setTimeout(() => { if (!IS_MOBILE && A.kind === 'youtube' && !ytAudible()) $('#unmute').classList.add('on'); }, 1200);
 const GESTURES = ['pointerup', 'touchend', 'click', 'keydown'];
 const firstGesture = () => {
   ensureAudio();
@@ -6476,7 +6519,7 @@ const firstGesture = () => {
     if (A.kind !== 'youtube' || ytAudible()) {
       $('#unmute').classList.remove('on');
       GESTURES.forEach((g) => removeEventListener(g, firstGesture, true));
-    } else {
+    } else if (!IS_MOBILE || document.body.classList.contains('ytcard')) {
       $('#unmute').classList.add('on');
     }
   }, 900);
