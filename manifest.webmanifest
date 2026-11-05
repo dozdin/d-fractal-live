@@ -1,0 +1,14 @@
+{
+  "name": "D-Fractal Live",
+  "short_name": "D-Fractal",
+  "description": "Visualizador musical: fractales, partículas y escenas interactivas",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#05040a",
+  "theme_color": "#05040a",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

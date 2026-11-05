@@ -2,7 +2,15 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05040a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="D-Fractal">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
 <title>D-Fractal Live</title>
 <!--
   D-Fractal Live — visualizador musical para pantalla grande.
@@ -125,10 +133,19 @@ select option { background: #15122a; }
   transition: opacity .4s; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 #ui.hide ~ #menuBtn { display: block; }
 body.idle #menuBtn { opacity: 0; }
+#fsFab { position: fixed; z-index: 6; left: 68px; top: 14px; width: 46px; height: 46px; border-radius: 50%; font-size: 20px;
+  background: rgba(10,8,20,.65); color: #fff; border: 1px solid var(--panel-border); cursor: pointer; display: none;
+  transition: opacity .4s; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+#ui.hide ~ #fsFab { display: block; }
+body.idle #fsFab { opacity: 0; }
+body.fs #fsFab { font-size: 17px; }
 
 /* ---- Móvil y tableta ---- */
 body.mobile #menuBtn { left: 12px; top: auto; bottom: calc(12px + env(safe-area-inset-bottom)); width: 54px; height: 54px; font-size: 24px; }
 body.mobile.idle #menuBtn { opacity: .22; }
+body.mobile #fsFab { left: 76px; top: auto; bottom: calc(12px + env(safe-area-inset-bottom)); width: 54px; height: 54px; font-size: 24px; }
+body.mobile.idle #fsFab { opacity: .22; }
+body.standalone #fsFab { display: none !important; }
 body.mobile #unmute { bottom: auto; top: 50%; transform: translate(-50%, -50%); padding: 18px 26px; font-size: 18px; text-align: center; width: max-content; max-width: 86vw; }
 body.mobile .btn { padding: 11px 12px; font-size: 14px; }
 body.mobile input[type=text], body.mobile select { font-size: 16px; padding: 10px; }
@@ -432,6 +449,7 @@ input[type=color] { width: 100%; height: 30px; border: 1px solid var(--panel-bor
   </div>
 </div>
 <button id="menuBtn" aria-label="Abrir el panel" title="Abrir el panel (H)">☰</button>
+<button id="fsFab" aria-label="Pantalla completa" title="Pantalla completa (F)">⛶</button>
 <button id="ytSkip">Seguir sin sonido</button>
 <input type="file" id="logoInput" accept="image/*" style="display:none">
 <img id="logo" alt="">
@@ -4945,7 +4963,7 @@ const ptrPos = (e) => {
   const x = (e.clientX - innerWidth / 2) / innerHeight, y = (innerHeight / 2 - e.clientY) / innerHeight;
   return Number.isFinite(x) && Number.isFinite(y) ? [x, y] : [PTR.tx, PTR.ty];   // algunos eventos sintéticos no traen coordenadas
 };
-const onUI = (e) => !!(e.target && e.target.closest && e.target.closest('#ui, #unmute, #dropHint, #ytSkip, #menuBtn'));
+const onUI = (e) => !!(e.target && e.target.closest && e.target.closest('#ui, #unmute, #dropHint, #ytSkip, #menuBtn, #fsFab'));
 function addClick(x, y) { PTR.clicks.set([x, y, Clock.t], (PTR.ci++ % 8) * 3); }
 addEventListener('pointermove', (e) => { if (onUI(e)) return; [PTR.tx, PTR.ty] = ptrPos(e); PTR.last = Clock.t; });
 addEventListener('pointerdown', (e) => {
@@ -6531,10 +6549,28 @@ $('#fsBtn').addEventListener('click', toggleFullscreen);
 $('#hideBtn').addEventListener('click', () => $('#ui').classList.add('hide'));
 $('#menuBtn').addEventListener('click', (e) => { e.stopPropagation(); showPanel(); });
 
+// Pantalla completa (con prefijos para Safari). En iPhone la web no puede ponerse a pantalla completa:
+// se explica cómo añadirla a la pantalla de inicio, que la abre sin barras.
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
 function toggleFullscreen() {
-  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
-  else document.exitFullscreen();
+  const d = document.documentElement;
+  if (fsEl()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+  const req = d.requestFullscreen || d.webkitRequestFullscreen;
+  if (req) {
+    const p = req.call(d, { navigationUI: 'hide' });
+    if (p && p.then) p.then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) { } }).catch(() => iosFsHelp());
+  } else iosFsHelp();
 }
+function iosFsHelp() {
+  toast('Para verlo a pantalla completa en iPhone: Compartir ⬆️ → "Añadir a pantalla de inicio" y ábrelo desde ese icono', 6000, true);
+}
+const syncFs = () => { const on = !!fsEl(); document.body.classList.toggle('fs', on); $('#fsFab').textContent = on ? '🗗' : '⛶'; };
+document.addEventListener('fullscreenchange', syncFs);
+document.addEventListener('webkitfullscreenchange', syncFs);
+if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) document.body.classList.add('standalone');
+$('#fsFab').addEventListener('click', (e) => { e.stopPropagation(); toggleFullscreen(); });
+// Doble clic / doble toque sobre los visuales: entra o sale de pantalla completa.
+addEventListener('dblclick', (e) => { if (!(e.target && e.target.closest && e.target.closest('#ui, #menuBtn, #fsFab, #ytSkip, #unmute'))) toggleFullscreen(); });
 
 // Arrastrar y soltar canciones
 let dragDepth = 0;
@@ -6598,7 +6634,12 @@ addEventListener('mousemove', (e) => {
   wake();
   if (e.clientX < 60 && $('#ui').classList.contains('hide')) showPanel();
 });
-addEventListener('pointerdown', wake);
+addEventListener('pointerdown', (e) => {
+  // Tocar fuera del panel (en los visuales) lo oculta al momento.
+  const t = e.target;
+  if (!(t && t.closest && t.closest('#ui, #menuBtn, #fsFab, #ytSkip, #unmute, #dropHint'))) $('#ui').classList.add('hide');
+  wake();
+});
 ['pointerdown', 'input', 'change', 'wheel'].forEach((ev) => $('#ui').addEventListener(ev, () => { panelUsed = performance.now(); wake(); }, true));
 $('#ui').addEventListener('scroll', () => { panelUsed = performance.now(); wake(); }, true);
 wake();
